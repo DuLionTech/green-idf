@@ -47,3 +47,20 @@ heapless = "0.8.0"
 
 [build-dependencies]
 embuild = "0.33"
+
+[package.metadata.espflash]
+partition_table = "partitions.csv"
+
+[package.metadata.cargo_runner]
+# The string `$TARGET_FILE` will be replaced with the path from cargo.
+command = [
+    "cargo",
+    "espflash",
+    "save-image",
+    "--chip",
+    "esp32c6",
+    "--partition-table",
+    "partitions.csv",
+    "--monitor",
+    "$TARGET_FILE"
+]
