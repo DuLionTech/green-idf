@@ -81,12 +81,13 @@ fn configure_wifi<'a>(wifi: WifiDriver) -> Result<EspWifi> {
     Ok(wifi)
 }
 
-fn connect_wifi(wifi: &mut EspWifi, event_loop: EspSystemEventLoop) -> Result<()> {
+fn connect_wifi(wifi: &mut EspWifi, sys_loop: EspSystemEventLoop) -> Result<()> {
     wifi.start()?;
     wifi.connect()?;
 
-    let wifi = BlockingWifi::wrap(wifi, event_loop)?;
+    let wifi = BlockingWifi::wrap(wifi, sys_loop)?;
     wifi.wait_netif_up()?;
+
     let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
     println!("Connected! Wifi Interface Info: {ip_info:?}");
     Ok(())
