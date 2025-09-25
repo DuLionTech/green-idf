@@ -1,15 +1,17 @@
-mod util;
+mod utils;
 
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::PinDriver;
 use esp_idf_svc::hal::prelude::*;
+use esp_idf_svc::http::server::EspHttpServer;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
-use esp_idf_svc::wifi::{AuthMethod, BlockingWifi, ClientConfiguration, Configuration, EspWifi};
-use crate::util::{Result, Text};
+use esp_idf_svc::wifi::{AuthMethod, ClientConfiguration, Configuration, EspWifi};
+use crate::utils::{Result, Text};
 
-const WIFI_SSID: Text = Text::new(env!("ESP_WIFI_SSID"));
-const WIFI_PASS: Text = Text::new(env!("ESP_WIFI_PASS"));
+const WIFI_SSID: &str = env!("ESP_WIFI_SSID");
+const WIFI_PASS: &str = env!("ESP_WIFI_PASS");
+const STACK_SIZE: usize = 10_240;
 
 fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
@@ -17,10 +19,8 @@ fn main() -> Result<()> {
     let peripherals = Peripherals::take()?;
     let event_loop = EspSystemEventLoop::take()?;
     let partition = EspDefaultNvsPartition::take()?;
-    let mut wifi = BlockingWifi::wrap(
-        EspWifi::new(peripherals.modem, event_loop.clone(), Some(partition))?,
-        event_loop,
-    );
+    let mut wifi = EspWifi::new(peripherals.modem, event_loop.clone(), Some(partition))?;
+    connect_wifi(&mut wifi)?;
 
     let mut ch1 = PinDriver::output(peripherals.pins.gpio1)?;
     let mut ch2 = PinDriver::output(peripherals.pins.gpio2)?;
@@ -57,13 +57,32 @@ fn main() -> Result<()> {
 
 fn connect_wifi(wifi: &mut EspWifi) -> Result<()> {
     let client_config = ClientConfiguration {
-        ssid: WIFI_SSID.try_into()?,
+        ssid: Text::from(WIFI_SSID).try_into()?,
         bssid: None,
         auth_method: AuthMethod::WPA2Personal,
-        password: WIFI_PASS.try_into()?,
+        password: Text::from(WIFI_PASS).try_into()?,
         channel: None,
         ..Default::default()
     };
-    // let wifi_config: Configuration = Configuration::Client()
+    wifi.set_configuration(&Configuration::Client(client_config))?;
+    wifi.start();
+    wifi.connect()?;
+    // Wait for connection to happen
+    while !wifi.is_connected()? {
+        // Get and print connection configuration
+        let config = wifi.get_configuration()?;
+        println!("Waiting for station {:?}", config);
+        FreeRtos::delay_ms(250);
+    }
+    println!("Connected");
     Ok(())
+}
+
+fn create_server() -> Result<EspHttpServer<'static>> {
+    let server_configuration = esp_idf_svc::http::server::Configuration {
+        stack_size: STACK_SIZE,
+        ..Default::default()
+    };
+
+    Ok(EspHttpServer::new(&server_configuration)?)
 }
