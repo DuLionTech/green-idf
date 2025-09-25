@@ -9,9 +9,15 @@ use esp_idf_svc::hal::gpio::PinDriver;
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::http::server::{EspHttpServer, Method};
 use esp_idf_svc::io::Write;
+use esp_idf_svc::ipv4::{
+    ClientConfiguration as IpClientConfiguration, Configuration as IpConfiguration,
+    DHCPClientSettings,
+};
+use esp_idf_svc::netif::{EspNetif, NetifConfiguration, NetifStack};
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
-use esp_idf_svc::wifi::{AuthMethod, BlockingWifi, ClientConfiguration, Configuration, EspWifi};
-
+use esp_idf_svc::wifi::{
+    AuthMethod, BlockingWifi, ClientConfiguration, Configuration as WifiConfiguration, EspWifi, WifiDriver,
+};
 const WIFI_SSID: &str = env!("ESP_WIFI_SSID");
 const WIFI_PASS: &str = env!("ESP_WIFI_PASS");
 const STACK_SIZE: usize = 10_240;
@@ -21,10 +27,11 @@ fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
     let peripherals = Peripherals::take()?;
-    let event_loop = EspSystemEventLoop::take()?;
-    let partition = EspDefaultNvsPartition::take()?;
-    let mut wifi = EspWifi::new(peripherals.modem, event_loop.clone(), Some(partition))?;
-    let _blocking = connect_wifi(&mut wifi, event_loop)?;
+    let sys_loop = EspSystemEventLoop::take()?;
+    let nvs = EspDefaultNvsPartition::take()?;
+    let wifi = WifiDriver::new(peripherals.modem, sys_loop.clone(), Some(nvs))?;
+    let mut wifi = configure_wifi(wifi)?;
+    connect_wifi(&mut wifi, sys_loop)?;
 
     let mut server = create_server()?;
     server.fn_handler("/", Method::Get, |req| {
@@ -46,16 +53,35 @@ fn main() -> Result<()> {
     }
 }
 
-fn connect_wifi<'a>(wifi: &'a mut EspWifi<'static>, event_loop: EspSystemEventLoop) -> Result<BlockingWifi<&'a mut EspWifi<'static>>> {
-    let client_config = ClientConfiguration {
+fn configure_wifi<'a>(wifi: WifiDriver) -> Result<EspWifi> {
+    let dhcp_config = IpClientConfiguration::DHCP(
+        DHCPClientSettings {
+            hostname: Some(to_string("green")?),
+        },
+    );
+    let netif_config = NetifConfiguration {
+        ip_configuration: Some(IpConfiguration::Client(dhcp_config)),
+        ..NetifConfiguration::wifi_default_client()
+    };
+    let mut wifi = EspWifi::wrap_all(
+        wifi,
+        EspNetif::new_with_conf(&netif_config)?,
+        #[cfg(esp_idf_esp_wifi_softap_support)]
+        EspNetif::new(NetifStack::Ap)?,
+    )?;
+    let wifi_config = WifiConfiguration::Client(ClientConfiguration {
         ssid: to_string(WIFI_SSID)?,
         bssid: None,
         auth_method: AuthMethod::WPA2Personal,
         password: to_string(WIFI_PASS)?,
         channel: None,
         ..Default::default()
-    };
-    wifi.set_configuration(&Configuration::Client(client_config))?;
+    });
+    wifi.set_configuration(&wifi_config)?;
+    Ok(wifi)
+}
+
+fn connect_wifi(wifi: &mut EspWifi, event_loop: EspSystemEventLoop) -> Result<()> {
     wifi.start()?;
     wifi.connect()?;
 
@@ -63,7 +89,7 @@ fn connect_wifi<'a>(wifi: &'a mut EspWifi<'static>, event_loop: EspSystemEventLo
     wifi.wait_netif_up()?;
     let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
     println!("Connected! Wifi Interface Info: {ip_info:?}");
-    Ok(wifi)
+    Ok(())
 }
 
 fn create_server() -> Result<EspHttpServer<'static>> {

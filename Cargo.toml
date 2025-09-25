@@ -48,8 +48,8 @@ heapless = "0.8.0"
 [build-dependencies]
 embuild = "0.33"
 
-[package.metadata.espflash]
-partition_table = "partitions.csv"
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(esp_idf_esp_wifi_softap_support)'] }
 
 [package.metadata.cargo_runner]
 # The string `$TARGET_FILE` will be replaced with the path from cargo.
