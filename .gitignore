@@ -1,4 +1,5 @@
-/.idea
+.env
 /.embuild
-/target
+/.idea
 /Cargo.lock
+/target
