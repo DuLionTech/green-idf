@@ -1,17 +1,19 @@
 mod utils;
 
+use crate::utils::{to_string, Result};
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::PinDriver;
 use esp_idf_svc::hal::prelude::*;
-use esp_idf_svc::http::server::EspHttpServer;
+use esp_idf_svc::http::server::{EspHttpServer, Method};
+use esp_idf_svc::io::Write;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 use esp_idf_svc::wifi::{AuthMethod, ClientConfiguration, Configuration, EspWifi};
-use crate::utils::{Result, Text};
 
 const WIFI_SSID: &str = env!("ESP_WIFI_SSID");
 const WIFI_PASS: &str = env!("ESP_WIFI_PASS");
 const STACK_SIZE: usize = 10_240;
+static INDEX_HTML: &str = include_str!("index.html");
 
 fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
@@ -21,6 +23,11 @@ fn main() -> Result<()> {
     let partition = EspDefaultNvsPartition::take()?;
     let mut wifi = EspWifi::new(peripherals.modem, event_loop.clone(), Some(partition))?;
     connect_wifi(&mut wifi)?;
+
+    let mut server = create_server()?;
+    server.fn_handler("/", Method::Get, |req| {
+        req.into_ok_response()?.write_all(INDEX_HTML.as_bytes())
+    })?;
 
     let mut ch1 = PinDriver::output(peripherals.pins.gpio1)?;
     let mut ch2 = PinDriver::output(peripherals.pins.gpio2)?;
@@ -57,15 +64,15 @@ fn main() -> Result<()> {
 
 fn connect_wifi(wifi: &mut EspWifi) -> Result<()> {
     let client_config = ClientConfiguration {
-        ssid: Text::from(WIFI_SSID).try_into()?,
+        ssid: to_string(WIFI_SSID)?,
         bssid: None,
         auth_method: AuthMethod::WPA2Personal,
-        password: Text::from(WIFI_PASS).try_into()?,
+        password: to_string(WIFI_PASS)?,
         channel: None,
         ..Default::default()
     };
     wifi.set_configuration(&Configuration::Client(client_config))?;
-    wifi.start();
+    wifi.start()?;
     wifi.connect()?;
     // Wait for connection to happen
     while !wifi.is_connected()? {

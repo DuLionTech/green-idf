@@ -15,21 +15,9 @@ pub enum Error {
     StringError(),
 }
 
-pub struct Text<'a>(&'a str);
-
-impl<'a> From<&'a str> for Text<'a> {
-    fn from(value: &'a str) -> Self {
-        Self(value)
-    }
-}
-
-impl<'a, const N: usize> TryFrom<Text<'a>> for heapless::String<N> {
-    type Error = Error;
-
-    fn try_from(value: Text) -> std::result::Result<Self, Self::Error> {
-        heapless::String::try_from(value.0).map_err(|_| {
-            log::error!("Unable to convert string: {:#?}", value.0);
-            Error::StringError()
-        })
-    }
+pub fn to_string<const N: usize>(value: &str) -> Result<heapless::String<N>> {
+    heapless::String::try_from(value).map_err(|_| {
+        log::error!("Unable to convert string: {:#?}", value);
+        Error::StringError()
+    })
 }
