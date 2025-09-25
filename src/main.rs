@@ -59,6 +59,10 @@ fn main() -> Result<()> {
     ch5.set_low()?;
     FreeRtos::delay_ms(500);
     ch6.set_low()?;
+
+    core::mem::forget(wifi);
+    core::mem::forget(server);
+
     Ok(())
 }
 
