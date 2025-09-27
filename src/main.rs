@@ -2,11 +2,9 @@ mod led;
 mod relay;
 mod utils;
 
-use crate::led::{neopixel, Rgb};
+use crate::led::{NeoPixel, Rgb};
 use crate::relay::Relays;
 use crate::utils::{to_string, Result};
-use esp_idf_hal::rmt::config::TransmitConfig;
-use esp_idf_hal::rmt::TxRmtDriver;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::prelude::*;
@@ -34,11 +32,10 @@ fn main() -> Result<()> {
     esp_idf_svc::log::EspLogger::initialize_default();
     let peripherals = Peripherals::take()?;
 
-    let led = peripherals.pins.gpio38;
     let channel = peripherals.rmt.channel0;
-    let config = TransmitConfig::new().clock_divider(1);
-    let mut tx = TxRmtDriver::new(channel, led, &config)?;
-    neopixel(Rgb::new(25, 25, 25), &mut tx)?;
+    let led = peripherals.pins.gpio38;
+    let mut pixel = NeoPixel::new(channel, led)?;
+    pixel.send(Rgb::new(25, 25, 25))?;
 
     let sys_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
@@ -72,7 +69,7 @@ fn main() -> Result<()> {
     (0..360).cycle().try_for_each(|hue| {
         FreeRtos::delay_ms(10);
         let rgb = Rgb::from_hsv(hue, 100, 20)?;
-        neopixel(rgb, &mut tx)
+        pixel.send(rgb)
     })
 }
 

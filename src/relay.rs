@@ -1,5 +1,4 @@
 use crate::utils::Result;
-use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::Output;
 use esp_idf_svc::hal::gpio::*;
 use std::cell::RefCell;

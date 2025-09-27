@@ -1,31 +1,53 @@
 use crate::utils::{Error, Result};
-use esp_idf_hal::rmt::{FixedLengthSignal, PinState, Pulse, TxRmtDriver};
+use esp_idf_hal::gpio::OutputPin;
+use esp_idf_hal::peripheral::Peripheral;
+use esp_idf_hal::rmt::config::TransmitConfig;
+use esp_idf_hal::rmt::{FixedLengthSignal, PinState, Pulse, RmtChannel, TxRmtDriver};
 use std::time::Duration;
 
-pub fn neopixel(rgb: Rgb, tx: &mut TxRmtDriver) -> Result<()> {
-    let color: u32 = rgb.into();
-    let ticks_hz = tx.counter_clock()?;
-    let (t0h, t0l, t1h, t1l) = (
-        Pulse::new_with_duration(ticks_hz, PinState::High, &Duration::from_nanos(350))?,
-        Pulse::new_with_duration(ticks_hz, PinState::Low, &Duration::from_nanos(800))?,
-        Pulse::new_with_duration(ticks_hz, PinState::High, &Duration::from_nanos(700))?,
-        Pulse::new_with_duration(ticks_hz, PinState::Low, &Duration::from_nanos(600))?,
-    );
-    let mut signal = FixedLengthSignal::<24>::new();
-    for i in (0..24).rev() {
-        let p = 2_u32.pow(i);
-        let bit: bool = p & color != 0;
-        let (high_pulse, low_pulse) = if bit { (t1h, t1l) } else { (t0h, t0l) };
-        signal.set(23 - i as usize, &(high_pulse, low_pulse))?;
-    }
-    tx.start_blocking(&signal)?;
-    Ok(())
+pub struct NeoPixel<'d> {
+    t1: (Pulse, Pulse),
+    t0: (Pulse, Pulse),
+    tx: TxRmtDriver<'d>,
 }
 
 pub struct Rgb {
     r: u8,
     g: u8,
     b: u8,
+}
+
+impl<'d> NeoPixel<'d> {
+    pub fn new<C: RmtChannel>(
+        channel: impl Peripheral<P = C> + 'd,
+        led: impl Peripheral<P = impl OutputPin> + 'd,
+    ) -> Result<Self> {
+        let config = TransmitConfig::new().clock_divider(1);
+        let tx = TxRmtDriver::new(channel, led, &config)?;
+        let ticks_hz = tx.counter_clock()?;
+        let t1 = (
+            Pulse::new_with_duration(ticks_hz, PinState::High, &Duration::from_nanos(700))?,
+            Pulse::new_with_duration(ticks_hz, PinState::Low, &Duration::from_nanos(600))?,
+        );
+        let t0 = (
+            Pulse::new_with_duration(ticks_hz, PinState::High, &Duration::from_nanos(350))?,
+            Pulse::new_with_duration(ticks_hz, PinState::Low, &Duration::from_nanos(800))?,
+        );
+        Ok(Self { t0, t1, tx })
+    }
+
+    pub fn send(&mut self, rgb: Rgb) -> Result<()> {
+        let color: u32 = rgb.into();
+        let mut signal = FixedLengthSignal::<24>::new();
+        for i in (0..24).rev() {
+            let p = 2_u32.pow(i);
+            let bit: bool = p & color != 0;
+            let (high_pulse, low_pulse) = if bit { self.t1 } else { self.t0 };
+            signal.set(23 - i as usize, &(high_pulse, low_pulse))?;
+        }
+        self.tx.start_blocking(&signal)?;
+        Ok(())
+    }
 }
 
 impl Rgb {
