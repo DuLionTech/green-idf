@@ -2,99 +2,95 @@ use crate::utils::Result;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::Output;
 use esp_idf_svc::hal::gpio::*;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-pub enum RelayPin {
-    Ch1,
-    Ch2,
-    Ch3,
-    Ch4,
-    Ch5,
-    Ch6,
+pub struct Channel<'d> {
+    ch: PinDriver<'d, AnyOutputPin, Output>,
 }
 
-pub enum RelayState {
-    Close,
-    Open,
+pub struct Relays<'d> {
+    pub ch1: Rc<RefCell<Channel<'d>>>,
+    pub ch2: Rc<RefCell<Channel<'d>>>,
+    pub ch3: Rc<RefCell<Channel<'d>>>,
+    pub ch4: Rc<RefCell<Channel<'d>>>,
+    pub ch5: Rc<RefCell<Channel<'d>>>,
+    pub ch6: Rc<RefCell<Channel<'d>>>,
 }
 
-pub struct Relay<'a> {
-    ch1: PinDriver<'a, Gpio1, Output>,
-    ch2: PinDriver<'a, Gpio2, Output>,
-    ch3: PinDriver<'a, Gpio41, Output>,
-    ch4: PinDriver<'a, Gpio42, Output>,
-    ch5: PinDriver<'a, Gpio45, Output>,
-    ch6: PinDriver<'a, Gpio46, Output>,
+impl<'d> Channel<'d> {
+    pub fn on(&mut self) -> Result<()> {
+        self.ch.set_high()?;
+        Ok(())
+    }
+
+    pub fn off(&mut self) -> Result<()> {
+        self.ch.set_low()?;
+        Ok(())
+    }
+
+    pub fn toggle(&mut self) -> Result<()> {
+        self.ch.toggle()?;
+        Ok(())
+    }
 }
 
-impl<'a> Relay<'a> {
+pub struct RelayIterator<'d> {
+    channels: Vec<Rc<RefCell<Channel<'d>>>>,
+}
+
+impl<'d> Relays<'d> {
     pub fn new(
-        ch1: PinDriver<'a, Gpio1, Output>,
-        ch2: PinDriver<'a, Gpio2, Output>,
-        ch3: PinDriver<'a, Gpio41, Output>,
-        ch4: PinDriver<'a, Gpio42, Output>,
-        ch5: PinDriver<'a, Gpio45, Output>,
-        ch6: PinDriver<'a, Gpio46, Output>,
-    ) -> Self {
-        Self {
-            ch1,
-            ch2,
-            ch3,
-            ch4,
-            ch5,
-            ch6,
-        }
+        ch1: impl OutputPin + 'd,
+        ch2: impl OutputPin + 'd,
+        ch3: impl OutputPin + 'd,
+        ch4: impl OutputPin + 'd,
+        ch5: impl OutputPin + 'd,
+        ch6: impl OutputPin + 'd,
+    ) -> Result<Self> {
+        Ok(Self {
+            ch1: Rc::new(RefCell::new(Channel {
+                ch: PinDriver::output(ch1.downgrade_output())?,
+            })),
+            ch2: Rc::new(RefCell::new(Channel {
+                ch: PinDriver::output(ch2.downgrade_output())?,
+            })),
+            ch3: Rc::new(RefCell::new(Channel {
+                ch: PinDriver::output(ch3.downgrade_output())?,
+            })),
+            ch4: Rc::new(RefCell::new(Channel {
+                ch: PinDriver::output(ch4.downgrade_output())?,
+            })),
+            ch5: Rc::new(RefCell::new(Channel {
+                ch: PinDriver::output(ch5.downgrade_output())?,
+            })),
+            ch6: Rc::new(RefCell::new(Channel {
+                ch: PinDriver::output(ch6.downgrade_output())?,
+            })),
+        })
     }
+}
 
-    pub fn switch(&mut self, relay: RelayPin, state: RelayState) -> Result<()> {
-        use RelayPin::*;
-        use RelayState::*;
-        match state {
-            Close => match relay {
-                Ch1 => self.ch1.set_high()?,
-                Ch2 => self.ch2.set_high()?,
-                Ch3 => self.ch3.set_high()?,
-                Ch4 => self.ch4.set_high()?,
-                Ch5 => self.ch5.set_high()?,
-                Ch6 => self.ch6.set_high()?,
-            },
-            Open => match relay {
-                Ch1 => self.ch1.set_low()?,
-                Ch2 => self.ch2.set_low()?,
-                Ch3 => self.ch3.set_low()?,
-                Ch4 => self.ch4.set_low()?,
-                Ch5 => self.ch5.set_low()?,
-                Ch6 => self.ch6.set_low()?,
-            },
-        };
-        Ok(())
+impl<'d> IntoIterator for &Relays<'d> {
+    type Item = Rc<RefCell<Channel<'d>>>;
+    type IntoIter = RelayIterator<'d>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let channels = vec![
+            self.ch6.clone(),
+            self.ch5.clone(),
+            self.ch4.clone(),
+            self.ch3.clone(),
+            self.ch2.clone(),
+            self.ch1.clone(),
+        ];
+        RelayIterator { channels }
     }
+}
 
-    pub fn sequence(&mut self) -> Result<()> {
-        use RelayPin::*;
-        use RelayState::*;
-        self.switch(Ch1, Close)?;
-        FreeRtos::delay_ms(500);
-        self.switch(Ch2, Close)?;
-        FreeRtos::delay_ms(500);
-        self.switch(Ch3, Close)?;
-        FreeRtos::delay_ms(500);
-        self.switch(Ch4, Close)?;
-        FreeRtos::delay_ms(500);
-        self.switch(Ch5, Close)?;
-        FreeRtos::delay_ms(500);
-        self.switch(Ch6, Close)?;
-        FreeRtos::delay_ms(2000);
-        self.switch(Ch1, Open)?;
-        FreeRtos::delay_ms(500);
-        self.switch(Ch2, Open)?;
-        FreeRtos::delay_ms(500);
-        self.switch(Ch3, Open)?;
-        FreeRtos::delay_ms(500);
-        self.switch(Ch4, Open)?;
-        FreeRtos::delay_ms(500);
-        self.switch(Ch5, Open)?;
-        FreeRtos::delay_ms(500);
-        self.switch(Ch6, Open)?;
-        Ok(())
+impl<'d> Iterator for RelayIterator<'d> {
+    type Item = Rc<RefCell<Channel<'d>>>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.channels.pop()
     }
 }

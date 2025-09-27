@@ -1,11 +1,14 @@
+mod led;
 mod relay;
 mod utils;
 
-use crate::relay::Relay;
+use crate::led::{neopixel, Rgb};
+use crate::relay::Relays;
 use crate::utils::{to_string, Result};
+use esp_idf_hal::rmt::config::TransmitConfig;
+use esp_idf_hal::rmt::TxRmtDriver;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::delay::FreeRtos;
-use esp_idf_svc::hal::gpio::PinDriver;
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::http::server::{EspHttpServer, Method};
 use esp_idf_svc::io::Write;
@@ -30,6 +33,13 @@ fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
     let peripherals = Peripherals::take()?;
+
+    let led = peripherals.pins.gpio38;
+    let channel = peripherals.rmt.channel0;
+    let config = TransmitConfig::new().clock_divider(1);
+    let mut tx = TxRmtDriver::new(channel, led, &config)?;
+    neopixel(Rgb::new(25, 25, 25), &mut tx)?;
+
     let sys_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
     let wifi = WifiDriver::new(peripherals.modem, sys_loop.clone(), Some(nvs))?;
@@ -41,19 +51,29 @@ fn main() -> Result<()> {
         req.into_ok_response()?.write_all(INDEX_HTML.as_bytes())
     })?;
 
-    let mut relays = Relay::new(
-        PinDriver::output(peripherals.pins.gpio1)?,
-        PinDriver::output(peripherals.pins.gpio2)?,
-        PinDriver::output(peripherals.pins.gpio41)?,
-        PinDriver::output(peripherals.pins.gpio42)?,
-        PinDriver::output(peripherals.pins.gpio45)?,
-        PinDriver::output(peripherals.pins.gpio46)?,
-    );
-    relays.sequence()?;
-
-    loop {
-        FreeRtos::delay_ms(1000);
+    let relay = Relays::new(
+        peripherals.pins.gpio1,
+        peripherals.pins.gpio2,
+        peripherals.pins.gpio41,
+        peripherals.pins.gpio42,
+        peripherals.pins.gpio45,
+        peripherals.pins.gpio46,
+    )?;
+    for channel in &relay {
+        channel.borrow_mut().on()?;
+        FreeRtos::delay_ms(500);
     }
+    FreeRtos::delay_ms(1500);
+    for channel in &relay {
+        channel.borrow_mut().off()?;
+        FreeRtos::delay_ms(500);
+    }
+
+    (0..360).cycle().try_for_each(|hue| {
+        FreeRtos::delay_ms(10);
+        let rgb = Rgb::from_hsv(hue, 100, 20)?;
+        neopixel(rgb, &mut tx)
+    })
 }
 
 fn configure_wifi<'a>(driver: WifiDriver) -> Result<EspWifi> {

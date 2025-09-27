@@ -13,6 +13,9 @@ pub enum Error {
 
     #[error("String conversion failed")]
     StringError(),
+
+    #[error("Error: {0:?}")]
+    Error(&'static str),
 }
 
 pub fn to_string<const N: usize>(value: &str) -> Result<heapless::String<N>> {
