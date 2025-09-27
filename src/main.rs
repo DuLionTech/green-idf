@@ -32,11 +32,13 @@ fn main() -> Result<()> {
     esp_idf_svc::log::EspLogger::initialize_default();
     let peripherals = Peripherals::take()?;
 
+    // Configure LED
     let channel = peripherals.rmt.channel0;
     let led = peripherals.pins.gpio38;
     let mut pixel = NeoPixel::new(channel, led)?;
     pixel.send(Rgb::new(25, 25, 25))?;
 
+    // Configure WiFi
     let sys_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
     let wifi = WifiDriver::new(peripherals.modem, sys_loop.clone(), Some(nvs))?;
@@ -48,7 +50,8 @@ fn main() -> Result<()> {
         req.into_ok_response()?.write_all(INDEX_HTML.as_bytes())
     })?;
 
-    let relay = Relays::new(
+    // Configure relays
+    let relays = Relays::new(
         peripherals.pins.gpio1,
         peripherals.pins.gpio2,
         peripherals.pins.gpio41,
@@ -56,16 +59,17 @@ fn main() -> Result<()> {
         peripherals.pins.gpio45,
         peripherals.pins.gpio46,
     )?;
-    for channel in &relay {
+    for channel in &relays {
         channel.borrow_mut().on()?;
         FreeRtos::delay_ms(500);
     }
     FreeRtos::delay_ms(1500);
-    for channel in &relay {
+    for channel in &relays {
         channel.borrow_mut().off()?;
         FreeRtos::delay_ms(500);
     }
 
+    // HSV color cycle
     (0..360).cycle().try_for_each(|hue| {
         FreeRtos::delay_ms(10);
         let rgb = Rgb::from_hsv(hue, 100, 20)?;
