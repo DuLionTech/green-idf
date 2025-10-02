@@ -1,4 +1,4 @@
-use crate::utils::{Error, Result};
+use crate::prelude::*;
 use esp_idf_hal::gpio::OutputPin;
 use esp_idf_hal::peripheral::Peripheral;
 use esp_idf_hal::rmt::config::TransmitConfig;
@@ -36,7 +36,7 @@ impl<'d> NeoPixel<'d> {
         Ok(Self { t0, t1, tx })
     }
 
-    pub fn send(&mut self, rgb: Rgb) -> Result<()> {
+    pub fn update(&mut self, rgb: Rgb) -> Result<()> {
         let color: u32 = rgb.into();
         let mut signal = FixedLengthSignal::<24>::new();
         for i in (0..24).rev() {

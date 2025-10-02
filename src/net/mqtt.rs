@@ -1,4 +1,4 @@
-use crate::utils::Result;
+use crate::prelude::*;
 use esp_idf_svc::mqtt::client::{
     EspMqttClient, EspMqttConnection, EventPayload, MqttClientConfiguration, QoS,
 };

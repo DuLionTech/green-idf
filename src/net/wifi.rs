@@ -1,5 +1,4 @@
-use std::cell::RefCell;
-use crate::utils::{to_string, Result};
+use crate::prelude::*;
 use esp_idf_hal::modem::WifiModemPeripheral;
 use esp_idf_hal::peripheral::Peripheral;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
@@ -14,6 +13,7 @@ use esp_idf_svc::wifi::{
     WifiDriver,
 };
 use log::info;
+use std::cell::RefCell;
 
 const HOSTNAME: &str = "green";
 const WIFI_SSID: &str = env!("ESP_WIFI_SSID");

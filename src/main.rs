@@ -1,20 +1,18 @@
-mod led;
-mod relay;
-mod http;
-mod utils;
-mod wifi;
-mod mqtt;
+mod prelude;
+mod net;
+mod device;
 
-use crate::led::{NeoPixel, Rgb};
-use crate::relay::Relays;
-use crate::http::Http;
-use crate::utils::Result;
-use crate::wifi::Wifi;
+use crate::prelude::*;
+use device::led::{NeoPixel, Rgb};
+use device::relay::Relays;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 use log::info;
+use net::http::Http;
+use net::mqtt::Mqtt;
+use net::wifi::Wifi;
 
 fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
@@ -23,7 +21,7 @@ fn main() -> Result<()> {
 
     // Configure LED
     let mut pixel = NeoPixel::new(peripherals.rmt.channel0, peripherals.pins.gpio38)?;
-    pixel.send(Rgb::new(25, 25, 25))?;
+    pixel.update(Rgb::new(25, 25, 25))?;
 
     // Configure WiFi
     info!("Starting WiFi");
@@ -41,7 +39,7 @@ fn main() -> Result<()> {
 
     // Configure MQTT
     info!("Starting MQTT");
-    let mut mqtt = mqtt::Mqtt::new()?;
+    let mut mqtt = Mqtt::new()?;
     mqtt.start()?;
 
     // Configure relays
@@ -69,6 +67,6 @@ fn main() -> Result<()> {
     (0..360).cycle().try_for_each(|hue| {
         FreeRtos::delay_ms(10);
         let rgb = Rgb::from_hsv(hue, 100, 20)?;
-        pixel.send(rgb)
+        pixel.update(rgb)
     })
 }

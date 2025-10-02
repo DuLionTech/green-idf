@@ -1,4 +1,4 @@
-use crate::utils::Result;
+use crate::prelude::*;
 use esp_idf_svc::hal::gpio::Output;
 use esp_idf_svc::hal::gpio::*;
 use std::cell::RefCell;
