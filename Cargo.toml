@@ -48,6 +48,7 @@ thiserror = "2.0.16"
 
 [build-dependencies]
 embuild = "0.33"
+dotenv = "0.15.0"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(esp_idf_esp_wifi_softap_support)'] }

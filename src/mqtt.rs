@@ -5,8 +5,8 @@ use esp_idf_svc::mqtt::client::{
 use log::info;
 use std::time::Duration;
 
-const MQTT_URL: &str = "mqtt://lion.home.dulion.com:1883";
-const MQTT_CLIENT_ID: &str = "green-idf";
+const MQTT_URL: &str = env!("ESP_MQTT_URL");
+const MQTT_CID: &str = env!("ESP_MQTT_CID");
 const MQTT_TOPIC: &str = "green";
 const MQTT_PAYLOAD: &str = r#"{status: "green"}"#;
 
@@ -18,7 +18,7 @@ impl<'d> Mqtt<'d> {
     pub fn new() -> Result<Self> {
         Ok(Self {
             conf: MqttClientConfiguration {
-                client_id: Some(MQTT_CLIENT_ID),
+                client_id: Some(MQTT_CID),
                 ..Default::default()
             },
         })
