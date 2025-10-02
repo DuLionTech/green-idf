@@ -21,7 +21,7 @@ impl<'d> Server<'d> {
         Ok(Self { server })
     }
 
-    pub fn initial_handlers(&mut self) -> Result<()> {
+    pub fn start(&mut self) -> Result<()> {
         (&mut self.server).fn_handler("/", Method::Get, |req| {
             req.into_ok_response()?.write_all(INDEX_HTML.as_bytes())
         })?;

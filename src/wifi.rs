@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use crate::utils::{to_string, Result};
 use esp_idf_hal::modem::WifiModemPeripheral;
 use esp_idf_hal::peripheral::Peripheral;
@@ -12,14 +13,14 @@ use esp_idf_svc::wifi::{
     AuthMethod, BlockingWifi, ClientConfiguration, Configuration as WifiConfiguration, EspWifi,
     WifiDriver,
 };
+use log::info;
 
 const HOSTNAME: &str = "green";
 const WIFI_SSID: &str = env!("ESP_WIFI_SSID");
 const WIFI_PASS: &str = env!("ESP_WIFI_PASS");
 
 pub struct Wifi<'d> {
-    esp_wifi: EspWifi<'d>,
-    sys_loop: EspSystemEventLoop,
+    wifi: RefCell<BlockingWifi<EspWifi<'d>>>,
 }
 
 impl<'d> Wifi<'d> {
@@ -51,19 +52,21 @@ impl<'d> Wifi<'d> {
             ..Default::default()
         });
         esp_wifi.set_configuration(&wifi_config)?;
-        Ok(Self { esp_wifi, sys_loop })
+
+        let wifi = RefCell::new(BlockingWifi::wrap(esp_wifi, sys_loop)?);
+
+        Ok(Self { wifi })
     }
 
-    pub fn connect(self) -> Result<()> {
-        let mut wifi = self.esp_wifi;
+    pub fn connect(&self) -> Result<()> {
+        let mut wifi = self.wifi.borrow_mut();
         wifi.start()?;
         wifi.connect()?;
 
-        let wifi = BlockingWifi::wrap(wifi, self.sys_loop)?;
         wifi.wait_netif_up()?;
 
         let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
-        println!("Connected! Wifi Interface Info: {ip_info:?}");
+        info!("Connected! Wifi Interface Info: {ip_info:?}");
         Ok(())
     }
 }

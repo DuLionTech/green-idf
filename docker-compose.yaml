@@ -1,0 +1,12 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883" # Standard MQTT port
+      - "9001:9001" # Websocket port (optional)
+    volumes:
+      - ./mqtt/config:/mosquitto/config # Mount config directory
+      - ./mqtt/data:/mosquitto/data # Mount data directory for persistence
+      - ./mqtt/log:/mosquitto/log # Mount log directory

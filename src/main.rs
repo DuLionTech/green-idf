@@ -3,6 +3,7 @@ mod relay;
 mod server;
 mod utils;
 mod wifi;
+mod mqtt;
 
 use crate::led::{NeoPixel, Rgb};
 use crate::relay::Relays;
@@ -13,6 +14,7 @@ use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::prelude::*;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
+use log::info;
 
 fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
@@ -24,6 +26,7 @@ fn main() -> Result<()> {
     pixel.send(Rgb::new(25, 25, 25))?;
 
     // Configure WiFi
+    info!("Starting WiFi");
     let wifi = Wifi::new(
         peripherals.modem,
         EspSystemEventLoop::take()?,
@@ -32,8 +35,14 @@ fn main() -> Result<()> {
     wifi.connect()?;
 
     // Configure HTTP server
+    info!("Starting HTTP server");
     let mut server = Server::new()?;
-    server.initial_handlers()?;
+    server.start()?;
+
+    // Configure MQTT
+    info!("Starting MQTT");
+    let mut mqtt = mqtt::Mqtt::new()?;
+    mqtt.start()?;
 
     // Configure relays
     let relays = Relays::new(
