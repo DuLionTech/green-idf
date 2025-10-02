@@ -6,11 +6,11 @@ use esp_idf_svc::http::Method;
 const STACK_SIZE: usize = 10_240;
 static INDEX_HTML: &str = include_str!("index.html");
 
-pub struct Server<'d> {
+pub struct Http<'d> {
     server: EspHttpServer<'d>,
 }
 
-impl<'d> Server<'d> {
+impl<'d> Http<'d> {
     pub fn new() -> Result<Self> {
         let server_configuration = esp_idf_svc::http::server::Configuration {
             stack_size: STACK_SIZE,

@@ -1,13 +1,13 @@
 mod led;
 mod relay;
-mod server;
+mod http;
 mod utils;
 mod wifi;
 mod mqtt;
 
 use crate::led::{NeoPixel, Rgb};
 use crate::relay::Relays;
-use crate::server::Server;
+use crate::http::Http;
 use crate::utils::Result;
 use crate::wifi::Wifi;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
@@ -36,7 +36,7 @@ fn main() -> Result<()> {
 
     // Configure HTTP server
     info!("Starting HTTP server");
-    let mut server = Server::new()?;
+    let mut server = Http::new()?;
     server.start()?;
 
     // Configure MQTT
