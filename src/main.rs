@@ -1,10 +1,10 @@
-mod prelude;
-mod net;
 mod device;
+mod net;
+mod prelude;
 
 use crate::prelude::*;
 use device::led::{NeoPixel, Rgb};
-use device::relay::Relays;
+use device::relay::Controller;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::prelude::*;
@@ -43,14 +43,13 @@ fn main() -> Result<()> {
     mqtt.start()?;
 
     // Configure relays
-    let relays = Relays::new(
-        peripherals.pins.gpio1,
-        peripherals.pins.gpio2,
-        peripherals.pins.gpio41,
-        peripherals.pins.gpio42,
-        peripherals.pins.gpio45,
-        peripherals.pins.gpio46,
-    )?;
+    let relays = Controller::new()
+        .add_pin(peripherals.pins.gpio1)?
+        .add_pin(peripherals.pins.gpio2)?
+        .add_pin(peripherals.pins.gpio41)?
+        .add_pin(peripherals.pins.gpio42)?
+        .add_pin(peripherals.pins.gpio45)?
+        .add_pin(peripherals.pins.gpio46)?;
 
     // Blink relays
     for channel in &relays {

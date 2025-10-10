@@ -4,20 +4,11 @@ use esp_idf_svc::hal::gpio::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub struct Channel<'d> {
+pub struct Relay<'d> {
     ch: PinDriver<'d, AnyOutputPin, Output>,
 }
 
-pub struct Relays<'d> {
-    pub ch1: Rc<RefCell<Channel<'d>>>,
-    pub ch2: Rc<RefCell<Channel<'d>>>,
-    pub ch3: Rc<RefCell<Channel<'d>>>,
-    pub ch4: Rc<RefCell<Channel<'d>>>,
-    pub ch5: Rc<RefCell<Channel<'d>>>,
-    pub ch6: Rc<RefCell<Channel<'d>>>,
-}
-
-impl<'d> Channel<'d> {
+impl<'d> Relay<'d> {
     pub fn on(&mut self) -> Result<()> {
         self.ch.set_high()?;
         Ok(())
@@ -34,62 +25,42 @@ impl<'d> Channel<'d> {
     }
 }
 
-pub struct RelayIterator<'d> {
-    channels: Vec<Rc<RefCell<Channel<'d>>>>,
+pub struct Controller<'d> {
+    relays: Vec<Rc<RefCell<Relay<'d>>>>,
 }
 
-impl<'d> Relays<'d> {
-    pub fn new(
-        ch1: impl OutputPin + 'd,
-        ch2: impl OutputPin + 'd,
-        ch3: impl OutputPin + 'd,
-        ch4: impl OutputPin + 'd,
-        ch5: impl OutputPin + 'd,
-        ch6: impl OutputPin + 'd,
-    ) -> Result<Self> {
-        Ok(Self {
-            ch1: Rc::new(RefCell::new(Channel {
-                ch: PinDriver::output(ch1.downgrade_output())?,
-            })),
-            ch2: Rc::new(RefCell::new(Channel {
-                ch: PinDriver::output(ch2.downgrade_output())?,
-            })),
-            ch3: Rc::new(RefCell::new(Channel {
-                ch: PinDriver::output(ch3.downgrade_output())?,
-            })),
-            ch4: Rc::new(RefCell::new(Channel {
-                ch: PinDriver::output(ch4.downgrade_output())?,
-            })),
-            ch5: Rc::new(RefCell::new(Channel {
-                ch: PinDriver::output(ch5.downgrade_output())?,
-            })),
-            ch6: Rc::new(RefCell::new(Channel {
-                ch: PinDriver::output(ch6.downgrade_output())?,
-            })),
-        })
+impl<'d> Controller<'d> {
+    pub fn new() -> Self {
+        Self { relays: Vec::new() }
+    }
+
+    pub fn add_pin(mut self, relay: impl OutputPin + 'd) -> Result<Self> {
+        self.relays.push(Rc::new(RefCell::new(Relay {
+            ch: PinDriver::output(relay.downgrade_output())?,
+        })));
+        Ok(self)
     }
 }
 
-impl<'d> IntoIterator for &Relays<'d> {
-    type Item = Rc<RefCell<Channel<'d>>>;
+impl<'d> IntoIterator for &Controller<'d> {
+    type Item = Rc<RefCell<Relay<'d>>>;
     type IntoIter = RelayIterator<'d>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let channels = vec![
-            self.ch6.clone(),
-            self.ch5.clone(),
-            self.ch4.clone(),
-            self.ch3.clone(),
-            self.ch2.clone(),
-            self.ch1.clone(),
-        ];
-        RelayIterator { channels }
+        RelayIterator {
+            relays: self.relays.clone(),
+        }
     }
 }
 
+pub struct RelayIterator<'d> {
+    relays: Vec<Rc<RefCell<Relay<'d>>>>,
+}
+
 impl<'d> Iterator for RelayIterator<'d> {
-    type Item = Rc<RefCell<Channel<'d>>>;
+    type Item = Rc<RefCell<Relay<'d>>>;
+
     fn next(&mut self) -> Option<Self::Item> {
-        self.channels.pop()
+        self.relays.pop()
     }
 }
